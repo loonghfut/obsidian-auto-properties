@@ -1,6 +1,7 @@
 import { MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf } from 'obsidian'
 import {
 	DEFAULT_SETTINGS,
+	DEFAULT_AUTOPROP_RULE,
 	AutoPropertyPluginSettings,
 	AutoPropertiesSettingsTab,
 	AutoPropRule
@@ -147,6 +148,11 @@ export default class AutoPropertyPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			(await this.loadData()) as Partial<AutoPropertyPluginSettings>
 		)
+		this.settings.autopropertySettings =
+			this.settings.autopropertySettings.map(autoProp => ({
+				...DEFAULT_AUTOPROP_RULE,
+				...autoProp
+			}))
 	}
 
 	async saveSettings () {
@@ -312,15 +318,21 @@ export default class AutoPropertyPlugin extends Plugin {
 		}
 
 		const lines = bodyContent.split(/\r\n|\r|\n/)
-		let matches: string[] = []
-
-		matches = lines.filter(line =>
-			AutoPropertyPlugin.lineMatchesRule(line, autoProp)
-		)
+		const matchedIndexes = lines
+			.map((line, index) => ({ line, index }))
+			.filter(({ line }) => AutoPropertyPlugin.lineMatchesRule(line, autoProp))
+			.map(({ index }) => index)
 
 		if (autoProp.rulePartOne === 'count') {
-			return matches.length
+			return matchedIndexes.length
 		}
+
+		let matches: string[] = matchedIndexes.map(matchedIndex => {
+			if (autoProp.modifierUseNextBlock === 'nextBlock') {
+				return AutoPropertyPlugin.extractNextBlockContent(lines, matchedIndex)
+			}
+			return lines[matchedIndex]
+		})
 
 		if (matches.length === 0) return ''
 
@@ -332,6 +344,16 @@ export default class AutoPropertyPlugin extends Plugin {
 
 		if (autoProp.modifierWhitespace === 'trim') {
 			matches = matches.map(matchedLine => matchedLine.trim())
+		}
+
+		if (autoProp.postProcessEnabled && autoProp.postProcessRegex) {
+			matches = matches.map(matchedLine =>
+				AutoPropertyPlugin.applyPostProcess(
+					matchedLine,
+					autoProp.postProcessRegex,
+					autoProp.postProcessReplacement
+				)
+			)
 		}
 
 		// Look for possible block IDs and, if found, convert to links to said blocks
@@ -363,26 +385,75 @@ export default class AutoPropertyPlugin extends Plugin {
 	}
 
 	static lineMatchesRule (line: string, autoProp: AutoPropRule): boolean {
+		let searchValue = autoProp.ruleValue
 		if (autoProp.modifierCaseSensitive === 'insensitive') {
 			line = line.toLowerCase()
-			autoProp.ruleValue = autoProp.ruleValue.toLowerCase()
+			searchValue = searchValue.toLowerCase()
 		}
 		if (autoProp.rulePartTwo === 'startsWith') {
 			if (autoProp.modifierWhitespace === 'trim')
-				return line.trim().startsWith(autoProp.ruleValue)
-			return line.startsWith(autoProp.ruleValue)
+				return line.trim().startsWith(searchValue)
+			return line.startsWith(searchValue)
 		} else if (autoProp.rulePartTwo === 'contains') {
-			return line.includes(autoProp.ruleValue)
+			return line.includes(searchValue)
 		} else if (autoProp.rulePartTwo === 'endsWith') {
 			if (autoProp.modifierWhitespace === 'trim')
-				return line.trim().endsWith(autoProp.ruleValue)
-			return line.endsWith(autoProp.ruleValue)
+				return line.trim().endsWith(searchValue)
+			return line.endsWith(searchValue)
 		} else if (autoProp.rulePartTwo === 'regex') {
 			if (autoProp.modifierWhitespace === 'trim')
-				return new RegExp(autoProp.ruleValue).test(line.trim())
-			return new RegExp(autoProp.ruleValue).test(line.trim())
+				return new RegExp(searchValue).test(line.trim())
+			return new RegExp(searchValue).test(line.trim())
 		}
 		return false
+	}
+
+	static applyPostProcess (
+		value: string,
+		regexPattern: string,
+		replacement: string
+	): string {
+		try {
+			return value.replace(new RegExp(regexPattern), replacement)
+		} catch (_error) {
+			return value
+		}
+	}
+
+	static extractNextBlockContent (
+		lines: string[],
+		matchedLineIndex: number
+	): string {
+		let index = matchedLineIndex
+
+		while (
+			index + 1 < lines.length &&
+			!AutoPropertyPlugin.isBlankLine(lines[index + 1])
+		) {
+			index++
+		}
+
+		index++
+		while (index < lines.length && AutoPropertyPlugin.isBlankLine(lines[index])) {
+			index++
+		}
+
+		if (index >= lines.length) return ''
+
+		const nextBlockStart = index
+		while (
+			index + 1 < lines.length &&
+			!AutoPropertyPlugin.isBlankLine(lines[index + 1])
+		) {
+			index++
+		}
+
+		const nextBlockEnd = index
+		return lines.slice(nextBlockStart, nextBlockEnd + 1).join('\n')
+	}
+
+	static isBlankLine (line: string): boolean {
+		return line.trim().length === 0
 	}
 
 	//#endregion

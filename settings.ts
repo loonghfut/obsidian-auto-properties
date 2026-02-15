@@ -17,8 +17,29 @@ export interface AutoPropRule {
 	modifierWhitespace: 'trim' | 'noTrim'
 	modifierOmitSearch: 'none' | 'omit'
 	modifierCaseSensitive: 'sensitive' | 'insensitive'
+	modifierUseNextBlock: 'none' | 'nextBlock'
+	postProcessEnabled: boolean
+	postProcessRegex: string
+	postProcessReplacement: string
 	autoAdd: boolean
 	rule: 'built' | 'created' | 'modified' | 'characterCount'
+}
+
+export const DEFAULT_AUTOPROP_RULE: AutoPropRule = {
+	key: '',
+	enabled: true,
+	rulePartOne: 'first',
+	rulePartTwo: 'startsWith',
+	ruleValue: '',
+	modifierWhitespace: 'trim',
+	modifierOmitSearch: 'none',
+	modifierCaseSensitive: 'insensitive',
+	modifierUseNextBlock: 'none',
+	postProcessEnabled: false,
+	postProcessRegex: '',
+	postProcessReplacement: '',
+	autoAdd: false,
+	rule: 'built'
 }
 
 export const DEFAULT_SETTINGS: AutoPropertyPluginSettings = {
@@ -109,18 +130,7 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 		addButton.setText('添加自动属性')
 		addButton.addClass('my-button')
 		addButton.onclick = async () => {
-			this.plugin.settings.autopropertySettings.push({
-				key: '',
-				enabled: true,
-				rulePartOne: 'first',
-				rulePartTwo: 'startsWith',
-				ruleValue: '',
-				modifierWhitespace: 'trim',
-				modifierOmitSearch: 'none',
-				modifierCaseSensitive: 'insensitive',
-				autoAdd: false,
-				rule: 'built'
-			})
+			this.plugin.settings.autopropertySettings.push({ ...DEFAULT_AUTOPROP_RULE })
 			await this.plugin.saveSettings()
 			this.display() // Refresh the settings tab to show the new property
 		}
@@ -132,16 +142,8 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 		index: number
 	): HTMLElement {
 		let wipAutoProp = {
-			key: autoProp.key,
-			enabled: autoProp.enabled,
-			rulePartOne: autoProp.rulePartOne,
-			rulePartTwo: autoProp.rulePartTwo,
-			ruleValue: autoProp.ruleValue,
-			modifierWhitespace: autoProp.modifierWhitespace,
-			modifierOmitSearch: autoProp.modifierOmitSearch,
-			modifierCaseSensitive: autoProp.modifierCaseSensitive,
-			autoAdd: autoProp.autoAdd,
-			rule: autoProp.rule
+			...DEFAULT_AUTOPROP_RULE,
+			...autoProp
 		}
 		const panel = document.createElement('div')
 		panel.addClass('property-panel')
@@ -311,6 +313,60 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 					})
 			})
 
+		new Setting(modifierContainer)
+			.setName('提取匹配块的下一个块')
+			.setDesc('启用后，将返回匹配块之后的下一个 Markdown 块内容。')
+			.addToggle(toggle => {
+				toggle
+					.setValue(wipAutoProp.modifierUseNextBlock === 'nextBlock')
+					.onChange(value => {
+						if (value) {
+							wipAutoProp.modifierUseNextBlock = 'nextBlock'
+						} else {
+							wipAutoProp.modifierUseNextBlock = 'none'
+						}
+						updateSaveButtonStatus()
+					})
+			})
+
+		new Setting(lineRulesContainer)
+			.setName('匹配后文本处理')
+			.setDesc('识别到匹配行后，在写入属性前执行正则替换。')
+			.addToggle(toggle => {
+				toggle
+					.setValue(wipAutoProp.postProcessEnabled)
+					.onChange(value => {
+						wipAutoProp.postProcessEnabled = value
+						updateSaveButtonStatus()
+					})
+			})
+
+		new Setting(lineRulesContainer)
+			.setName('后处理匹配正则')
+			.setDesc('示例：^[-*]\\s+\\[ \\]\\s*')
+			.addText(text =>
+				text
+					.setPlaceholder('请输入正则表达式')
+					.setValue(wipAutoProp.postProcessRegex)
+					.onChange(value => {
+						wipAutoProp.postProcessRegex = value
+						updateSaveButtonStatus()
+					})
+			)
+
+		new Setting(lineRulesContainer)
+			.setName('后处理替换文本')
+			.setDesc('支持 $1 等分组引用，留空表示删除匹配内容。')
+			.addText(text =>
+				text
+					.setPlaceholder('请输入替换文本（可为空）')
+					.setValue(wipAutoProp.postProcessReplacement)
+					.onChange(value => {
+						wipAutoProp.postProcessReplacement = value
+						updateSaveButtonStatus()
+					})
+			)
+
 		new Setting(container)
 			.setName('自动添加属性到笔记')
 			.setDesc(
@@ -392,6 +448,9 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 			if (prop.rule === 'created') text = '文件创建时间'
 			if (prop.rule === 'modified') text = '文件修改时间'
 			if (prop.rule === 'characterCount') text = '笔记正文字符数'
+			if (prop.modifierUseNextBlock === 'nextBlock')
+				text += '（📦 提取下一个块）'
+			if (prop.postProcessEnabled) text += '（✂️ 启用后处理）'
 			if (prop.autoAdd) text += '（➕ 已启用自动添加）'
 			return text
 		}
