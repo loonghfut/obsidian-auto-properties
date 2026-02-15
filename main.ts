@@ -328,10 +328,25 @@ export default class AutoPropertyPlugin extends Plugin {
 		}
 
 		let matches: string[] = matchedIndexes.map(matchedIndex => {
-			if (autoProp.modifierUseNextBlock === 'nextBlock') {
-				return AutoPropertyPlugin.extractNextBlockContent(lines, matchedIndex)
+			switch (autoProp.modifierUseNextBlock) {
+				case 'nextLine':
+					return matchedIndex + 1 < lines.length
+						? lines[matchedIndex + 1]
+						: ''
+				case 'nextBlock':
+					return AutoPropertyPlugin.extractNextBlockContent(
+						lines,
+						matchedIndex
+					)
+				case 'currentBlock':
+					return AutoPropertyPlugin.extractCurrentBlockContent(
+						lines,
+						matchedIndex
+					)
+				case 'none':
+				default:
+					return lines[matchedIndex]
 			}
-			return lines[matchedIndex]
 		})
 
 		if (matches.length === 0) return ''
@@ -450,6 +465,23 @@ export default class AutoPropertyPlugin extends Plugin {
 
 		const nextBlockEnd = index
 		return lines.slice(nextBlockStart, nextBlockEnd + 1).join('\n')
+	}
+
+	static extractCurrentBlockContent (
+		lines: string[],
+		matchedLineIndex: number
+	): string {
+		// Scan upwards to find the start of the current block
+		let start = matchedLineIndex
+		while (start - 1 >= 0 && !AutoPropertyPlugin.isBlankLine(lines[start - 1])) {
+			start--
+		}
+		// Scan downwards to find the end of the current block
+		let end = matchedLineIndex
+		while (end + 1 < lines.length && !AutoPropertyPlugin.isBlankLine(lines[end + 1])) {
+			end++
+		}
+		return lines.slice(start, end + 1).join('\n')
 	}
 
 	static isBlankLine (line: string): boolean {

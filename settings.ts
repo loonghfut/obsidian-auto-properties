@@ -17,7 +17,7 @@ export interface AutoPropRule {
 	modifierWhitespace: 'trim' | 'noTrim'
 	modifierOmitSearch: 'none' | 'omit'
 	modifierCaseSensitive: 'sensitive' | 'insensitive'
-	modifierUseNextBlock: 'none' | 'nextBlock'
+	modifierUseNextBlock: 'none' | 'nextLine' | 'nextBlock' | 'currentBlock'
 	postProcessEnabled: boolean
 	postProcessRegex: string
 	postProcessReplacement: string
@@ -314,20 +314,23 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 			})
 
 		new Setting(modifierContainer)
-			.setName('提取匹配块的下一个块')
-			.setDesc('启用后，将返回匹配块之后的下一个 Markdown 块内容。')
-			.addToggle(toggle => {
-				toggle
-					.setValue(wipAutoProp.modifierUseNextBlock === 'nextBlock')
-					.onChange(value => {
-						if (value) {
-							wipAutoProp.modifierUseNextBlock = 'nextBlock'
-						} else {
-							wipAutoProp.modifierUseNextBlock = 'none'
-						}
+				.setName('匹配后提取')
+				.setDesc('选择在匹配到目标行后要提取的内容。')
+				.addDropdown(dropdown => {
+					dropdown.addOption('none', '不额外提取（使用匹配行）')
+					dropdown.addOption('nextLine', '提取下一行')
+					dropdown.addOption('nextBlock', '提取下一块')
+					dropdown.addOption('currentBlock', '提取目标块（当前块）')
+					dropdown.setValue(wipAutoProp.modifierUseNextBlock)
+					dropdown.onChange(value => {
+						wipAutoProp.modifierUseNextBlock = value as
+							| 'none'
+							| 'nextLine'
+							| 'nextBlock'
+							| 'currentBlock'
 						updateSaveButtonStatus()
 					})
-			})
+				})
 
 		new Setting(lineRulesContainer)
 			.setName('匹配后文本处理')
@@ -450,6 +453,10 @@ export class AutoPropertiesSettingsTab extends PluginSettingTab {
 			if (prop.rule === 'characterCount') text = '笔记正文字符数'
 			if (prop.modifierUseNextBlock === 'nextBlock')
 				text += '（📦 提取下一个块）'
+			if (prop.modifierUseNextBlock === 'nextLine')
+				text += '（➡️ 提取下一行）'
+			if (prop.modifierUseNextBlock === 'currentBlock')
+				text += '（📦 提取当前块）'
 			if (prop.postProcessEnabled) text += '（✂️ 启用后处理）'
 			if (prop.autoAdd) text += '（➕ 已启用自动添加）'
 			return text
