@@ -27,7 +27,7 @@ export default class AutoPropertyPlugin extends Plugin {
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'update-all',
-			name: 'Update values for every file in the vault',
+			name: '更新整个库中所有文件的属性值',
 			callback: () => {
 				this.updateAllNotes()
 			}
@@ -36,7 +36,7 @@ export default class AutoPropertyPlugin extends Plugin {
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
 		this.addCommand({
 			id: 'update-current',
-			name: 'Update values',
+			name: '更新属性值',
 			checkCallback: (checking: boolean) => {
 				// Conditions to check
 				const markdownView =
@@ -157,7 +157,7 @@ export default class AutoPropertyPlugin extends Plugin {
 		const allNotes = this.app.vault
 			.getFiles()
 			.filter(file => file.extension === 'md')
-		new Notice('Updating every auto-property in every note')
+		new Notice('正在更新整个库中所有笔记的自动属性')
 		allNotes.forEach(
 			note => void this.applyAllRulesToFile(note, undefined, false)
 		)
@@ -244,11 +244,7 @@ export default class AutoPropertyPlugin extends Plugin {
 			propertiesChanged > 0 &&
 			this.settings.showNotices
 		) {
-			new Notice(
-				`Updated ${propertiesChanged} auto-propert${
-					propertiesChanged === 1 ? 'y' : 'ies'
-				}`
-			)
+			new Notice(`已更新 ${propertiesChanged} 个自动属性`)
 		}
 	}
 

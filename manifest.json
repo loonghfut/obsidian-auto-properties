@@ -3,7 +3,7 @@
 	"name": "Auto-Properties",
 	"version": "1.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Create automated properties based on note content and rules.",
+	"description": "根据笔记内容与规则自动生成并更新属性。",
 	"author": "Aaron Gillespie",
 	"authorUrl": "https://aarongilly.com",
 	"fundingUrl": "https://www.buymeacoffee.com/aarongilly",
